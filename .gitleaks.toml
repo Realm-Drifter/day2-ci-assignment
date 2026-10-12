@@ -1,0 +1,8 @@
+title = "Gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives"
+commits = ["9af2544da44a23c6fbbd48052645506024666eeb"]
