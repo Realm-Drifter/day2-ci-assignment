@@ -62,7 +62,7 @@ jobs:
 
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-report
           path: app/reports/junit.xml
@@ -91,7 +91,7 @@ jobs:
           mkdir -p dist
           tar -czf "dist/temperature-$VERSION.tar.gz" -C app temperature.py README.md
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: package
           path: dist/temperature-${{ steps.ver.outputs.version }}.tar.gz
