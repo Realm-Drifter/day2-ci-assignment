@@ -1,0 +1,39 @@
+name: Post-scan
+
+on:
+  workflow_call:
+
+jobs:
+  post-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+
+      - name: Check package contents
+        run: |
+          tar -tzf temperature-*.tar.gz | LC_ALL=C sort > contents.txt
+          printf 'README.md\ntemperature.py\n' > expected.txt
+          diff expected.txt contents.txt
+
+      - name: Extract package
+        run: |
+          mkdir extracted
+          tar -xzf temperature-*.tar.gz -C extracted
+
+      - name: Scan for hardcoded secrets
+        run: |
+          if grep -rEi "(api_key|secret|password|token)[[:space:]]*=[[:space:]]*['\"]" extracted; then
+            echo "Possible hardcoded secret found"
+            exit 1
+          fi
+
+      - name: Scan shipped code
+        run: |
+          pip install bandit
+          bandit -r extracted -ll
+
+      - name: Print checksum
+        run: sha256sum temperature-*.tar.gz
