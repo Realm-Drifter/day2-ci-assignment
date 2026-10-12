@@ -1,2 +1,83 @@
 name: Day 2 CI
 run-name: ${{github.actor}} triggered this run
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      python-ver:
+        description: python versions to pick
+        type: choice
+        options:
+          - "3.12"
+          - "3.13"
+        default: "3.13"
+      create-package:
+        description: Create the package
+        type: boolean
+        default: true
+
+  schedule:
+    - cron: "0 7 * * 1"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-ver: ${{inputs.python-ver || '3.13'}}
+      - name: Installing dependencies
+        run: pip install -r requirements.txt pytest
+      - name: run pytest
+        run: pytest
+      - name: Announce failure
+        if: failure()
+        run: echo "🚨 Tests failed on ${{ github.ref_name }}"
+
+  package:
+    needs: test
+    if: ${{ github.event_name == 'schedule' || inputs.create-package }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: build a .tar.gz
+        run: tar -czf app.tar.gz app/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-package
+          path: app.tar.gz
+
+  verify:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-package
+
+      - name: package verification
+        run: |
+          tar -tzf app.tar.gz        # archive is valid and listable
+          mkdir extracted
+          tar -xzf app.tar.gz -C extracted
+          ls -R extracted
+
+  report:
+    needs: [test, package]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Print results
+        run: |
+          echo "test:    ${{ needs.test.result }}"
+          echo "package: ${{ needs.package.result }}"
