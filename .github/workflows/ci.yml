@@ -35,6 +35,7 @@ env:
 jobs:
   pre-scan:
     uses: ./.github/workflows/pre-scan.yml
+    secrets: inherit
     with:
       python-version: ${{ inputs.python-version || '3.13' }}
 
