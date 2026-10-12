@@ -33,7 +33,13 @@ env:
   APP_NAME: temperature
 
 jobs:
+  pre-scan:
+    uses: ./.github/workflows/pre-scan.yml
+    with:
+      python-version: ${{ inputs.python-version || '3.13' }}
+
   test:
+    needs: pre-scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -113,8 +119,12 @@ jobs:
           cd extracted
           python3 -c "from temperature import celsius_to_fahrenheit as c; assert c(100) == 212; print('Package OK')"
 
+  post-scan:
+    needs: package
+    uses: ./.github/workflows/post-scan.yml
+
   pr-comment:
-    needs: [package, verify]
+    needs: [package, verify, post-scan]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -131,13 +141,16 @@ jobs:
           gh pr comment "$PR_NUMBER" --body "✅ CI passed. Package version $VERSION is ready."
 
   report:
-    needs: [test, package]
+    needs: [pre-scan, test, package, verify, post-scan]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
+      PRE_SCAN_RESULT: ${{ needs.pre-scan.result }}
       TEST_RESULT: ${{ needs.test.result }}
       PACKAGE_RESULT: ${{ needs.package.result }}
+      VERIFY_RESULT: ${{ needs.verify.result }}
+      POST_SCAN_RESULT: ${{ needs.post-scan.result }}
       VERSION: ${{ needs.package.outputs.version || 'n/a' }}
       EVENT_NAME: ${{ github.event_name }}
       SHA: ${{ github.sha }}
@@ -146,8 +159,11 @@ jobs:
     steps:
       - name: Print results
         run: |
-          echo "test:    $TEST_RESULT"
-          echo "package: $PACKAGE_RESULT"
+          echo "pre-scan:  $PRE_SCAN_RESULT"
+          echo "test:      $TEST_RESULT"
+          echo "package:   $PACKAGE_RESULT"
+          echo "verify:    $VERIFY_RESULT"
+          echo "post-scan: $POST_SCAN_RESULT"
 
       - name: Write job summary
         run: |
@@ -160,8 +176,11 @@ jobs:
             echo "| Version | $VERSION |"
             echo "| Commit | ${SHA::7} |"
             echo "| Event | $EVENT_NAME |"
+            echo "| pre-scan | $PRE_SCAN_RESULT |"
             echo "| test | $TEST_RESULT |"
             echo "| package | $PACKAGE_RESULT |"
+            echo "| verify | $VERIFY_RESULT |"
+            echo "| post-scan | $POST_SCAN_RESULT |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Send notification
