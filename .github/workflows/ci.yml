@@ -1,0 +1,2 @@
+name: Day 2 CI
+run-name: ${{github.actor}} triggered this run
